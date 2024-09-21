@@ -1,11 +1,11 @@
 use std::{fmt::Display, str::FromStr};
 
+use crate::{Error, Result};
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct ChunkType {
     type_code: [u8; 4],
 }
-
-
 
 impl Display for ChunkType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -18,21 +18,20 @@ impl Display for ChunkType {
 }
 
 impl FromStr for ChunkType {
-// impl FromStr for ChunkType{
-    type Err = &'static str;
+    type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         if s.len() != 4 {
-            return Err("Input must be exactly 4 bytes/characters long");
+            return Err(Box::from(ChunkTypeError::InvalidLength));
         }
 
         let code = s.as_bytes();
 
         if !code
             .iter()
-                .all(|&byt| byt.is_ascii() & byt.is_ascii_alphabetic())
+            .all(|&byt| byt.is_ascii() & byt.is_ascii_alphabetic())
         {
-            return Err("Not all ASCII");
+            return Err(Box::from(ChunkTypeError::NotASCII));
         }
 
         let mut chunk_code = [0u8; 4];
@@ -45,9 +44,9 @@ impl FromStr for ChunkType {
 }
 
 impl TryFrom<[u8; 4]> for ChunkType {
-    type Error = &'static str;
+    type Error = Error;
 
-    fn try_from(value: [u8; 4]) -> Result<Self, Self::Error> {
+    fn try_from(value: [u8; 4]) -> Result<Self> {
         Ok(ChunkType { type_code: value })
     }
 }
@@ -76,6 +75,25 @@ impl ChunkType {
 
     pub fn is_safe_to_copy(&self) -> bool {
         !self.type_code[3].is_ascii_uppercase()
+    }
+}
+
+#[derive(Debug)]
+pub enum ChunkTypeError {
+    InvalidLength,
+    NotASCII,
+}
+
+impl std::error::Error for ChunkTypeError {}
+
+impl Display for ChunkTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            ChunkTypeError::InvalidLength => {
+                write!(f, "Input must be exactly 4 bytes/characters long")
+            }
+            ChunkTypeError::NotASCII => write!(f, "Not all data is ASCII"),
+        }
     }
 }
 
