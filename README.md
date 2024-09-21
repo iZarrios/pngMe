@@ -1,1 +1,1 @@
-Learning Rust through [PNGme: An Intermediate Rust Project](https://picklenerd.github.io/pngme_book/)
+Learning Rust through [PNGme: An Intermediate Rust Project](https://jrdngr.github.io/pngme_book/)
