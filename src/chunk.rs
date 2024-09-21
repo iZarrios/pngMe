@@ -5,7 +5,7 @@ use crate::chunk_type::ChunkType;
 use crc;
 
 #[derive(Debug)]
-struct Chunk {
+pub struct Chunk {
     len: u32,
     typ: ChunkType,
     data: Vec<u8>,
@@ -78,7 +78,7 @@ impl TryFrom<&[u8]> for Chunk {
 
 #[allow(unused)]
 impl Chunk {
-    fn new(chunk_type: ChunkType, data: Vec<u8>) -> Self {
+    pub fn new(chunk_type: ChunkType, data: Vec<u8>) -> Self {
         let crc32: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
 
         let bytes: Vec<_> = chunk_type
@@ -94,22 +94,22 @@ impl Chunk {
             crc: crc32.checksum(&bytes),
         }
     }
-    fn length(&self) -> u32 {
+    pub fn length(&self) -> u32 {
         self.len
     }
-    fn chunk_type(&self) -> &ChunkType {
+    pub fn chunk_type(&self) -> &ChunkType {
         &self.typ
     }
-    fn data(&self) -> &[u8] {
+    pub fn data(&self) -> &[u8] {
         self.data.as_slice()
     }
-    fn crc(&self) -> u32 {
+    pub fn crc(&self) -> u32 {
         self.crc
     }
-    fn data_as_string(&self) -> Result<String> {
+    pub fn data_as_string(&self) -> Result<String> {
         Ok(String::from_utf8(self.data.clone())?)
     }
-    fn as_bytes(&self) -> Vec<u8> {
+    pub fn as_bytes(&self) -> Vec<u8> {
         self.data.clone()
     }
 }
