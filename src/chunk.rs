@@ -163,7 +163,6 @@ mod tests {
             .collect();
 
         let chnk = Chunk::try_from(chunk_data.as_ref()).unwrap();
-        println!("{:?}", chnk);
 
         chnk
     }
