@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::{chunk::Chunk, chunk_type::ChunkType, Error, Result};
 
-struct Png {
+pub struct Png {
     chunks: Vec<Chunk>,
 }
 
@@ -60,7 +60,7 @@ impl Png {
         &self.chunks
     }
 
-    fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
+    pub fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
         self.chunks
             .iter()
             .find(|chunk| chunk.chunk_type().to_string() == chunk_type)
@@ -110,10 +110,6 @@ impl TryFrom<&[u8]> for Png {
                 u32::from_be_bytes([value[idx], value[idx + 1], value[idx + 2], value[idx + 3]]);
             idx += 4;
 
-            println!("Chunk Type: {}", chunk_type);
-            println!("Chunk Data: {:?}", chunk_data);
-            println!("CRC: {}", crc);
-
             let chunk = Chunk::new(ChunkType::from_str(chunk_type)?, chunk_data.to_vec());
 
             chunks.push(chunk);
@@ -136,9 +132,8 @@ impl std::fmt::Display for Png {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chunk_type::ChunkType;
     use crate::chunk::Chunk;
-    use std::str::FromStr;
+    use crate::chunk_type::ChunkType;
     use std::convert::TryFrom;
 
     fn testing_chunks() -> Vec<Chunk> {
@@ -229,7 +224,6 @@ mod tests {
         assert!(png.is_err());
     }
 
-
     #[test]
     fn test_list_chunks() {
         let png = testing_png();
@@ -243,7 +237,6 @@ mod tests {
         let chunk = png.chunk_by_type("FrSt").unwrap();
         assert_eq!(&chunk.chunk_type().to_string(), "FrSt");
         assert_eq!(&chunk.data_as_string().unwrap(), "I am the first chunk");
-
     }
 
     #[test]
