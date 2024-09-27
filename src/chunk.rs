@@ -1,8 +1,28 @@
-use crate::Result;
+use crate::{Error, Result};
 use std::{fmt::Display, str::FromStr};
 
 use crate::chunk_type::ChunkType;
 use crc;
+
+#[derive(Debug)]
+pub enum ChunkkError {
+    InvalidUtf8,
+    InvalidChunkType,
+    InvalidCrc,
+    TooShort,
+}
+impl std::error::Error for ChunkkError {}
+
+impl std::fmt::Display for ChunkkError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ChunkkError::InvalidUtf8 => write!(f, "Invalid UTF-8 in chunk type"),
+            ChunkkError::InvalidChunkType => write!(f, "Invalid chunk type"),
+            ChunkkError::InvalidCrc => write!(f, "Invalid CRC"),
+            ChunkkError::TooShort => write!(f, "Input data must be at least 12 bytes long"),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Chunk {
@@ -23,14 +43,14 @@ impl Display for Chunk {
 }
 
 impl TryFrom<&[u8]> for Chunk {
-    type Error = &'static str;
+    type Error = Error;
 
-    fn try_from(value: &[u8]) -> std::result::Result<Chunk, &'static str> {
+    fn try_from(value: &[u8]) -> Result<Chunk> {
         let vc = value.to_vec();
 
         // check if the input slice is at least 12 bytes long
         if vc.len() < 12 {
-            return Err("Input data too short");
+            return Err(ChunkkError::TooShort.into());
         }
 
         // first 4 bytes is the length of the data
@@ -40,6 +60,7 @@ impl TryFrom<&[u8]> for Chunk {
         let chunk_type_bytes = &vc[4..8];
         let chunk_type_str = String::from_utf8(chunk_type_bytes.to_vec())
             .map_err(|_| "Invalid UTF-8 in chunk type")?;
+
         let chunk_type = ChunkType::from_str(&chunk_type_str)?;
 
         // next n bytes is the data
@@ -71,7 +92,7 @@ impl TryFrom<&[u8]> for Chunk {
                 crc,
             })
         } else {
-            Err("CRC check failed")
+            Err(ChunkkError::InvalidCrc.into())
         }
     }
 }
@@ -110,7 +131,13 @@ impl Chunk {
         Ok(String::from_utf8(self.data.clone())?)
     }
     pub fn as_bytes(&self) -> Vec<u8> {
-        self.data.clone()
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&self.len.to_be_bytes());
+        bytes.extend_from_slice(&self.typ.bytes());
+        bytes.extend_from_slice(&self.data);
+        bytes.extend_from_slice(&self.crc.to_be_bytes());
+
+        bytes
     }
 }
 
