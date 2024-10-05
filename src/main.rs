@@ -1,6 +1,6 @@
 use std::process;
 
-use args::{Cli, Commands};
+use args::Cli;
 use clap::Parser;
 use commands::run;
 
@@ -9,6 +9,8 @@ mod chunk;
 mod chunk_type;
 mod commands;
 mod png;
+mod ihdr_chunk;
+mod idat_chunk;
 
 pub type Error = Box<dyn std::error::Error>;
 pub type Result<T> = std::result::Result<T, Error>;

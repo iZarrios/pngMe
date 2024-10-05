@@ -1,44 +1,57 @@
-use crate::{Error, Result};
+use crate::{chunk_type, ihdr_chunk::IhdrChunk, Error, Result};
 use std::{fmt::Display, str::FromStr};
 
 use crate::chunk_type::ChunkType;
 use crc;
 
 #[derive(Debug)]
-pub enum ChunkkError {
+pub enum ChunkError {
     InvalidUtf8,
     InvalidChunkType,
     InvalidCrc,
     TooShort,
 }
-impl std::error::Error for ChunkkError {}
+impl std::error::Error for ChunkError {}
 
-impl std::fmt::Display for ChunkkError {
+impl std::fmt::Display for ChunkError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ChunkkError::InvalidUtf8 => write!(f, "Invalid UTF-8 in chunk type"),
-            ChunkkError::InvalidChunkType => write!(f, "Invalid chunk type"),
-            ChunkkError::InvalidCrc => write!(f, "Invalid CRC"),
-            ChunkkError::TooShort => write!(f, "Input data must be at least 12 bytes long"),
+            ChunkError::InvalidUtf8 => write!(f, "Invalid UTF-8 in chunk type"),
+            ChunkError::InvalidChunkType => write!(f, "Invalid chunk type"),
+            ChunkError::InvalidCrc => write!(f, "Invalid CRC"),
+            ChunkError::TooShort => write!(f, "Input data must be at least 12 bytes long"),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Chunk {
     len: u32,
-    typ: ChunkType,
-    data: Vec<u8>,
-    crc: u32,
+    chunk_type: ChunkType,
+    pub data: Vec<u8>,
+    pub crc: u32,
 }
 
 impl Display for Chunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Chunk: Data_len={}, type={}, crc={}",
-            self.len, self.typ, self.crc
-        )
+        match self.chunk_type.typ {
+            chunk_type::Types::IHDR => {
+                write!(f, "{}", IhdrChunk::try_from(self.clone()).unwrap())
+            }
+            chunk_type::Types::IDAT => {
+                writeln!(
+                    f,
+                    "Chunk: Data_len={}, Data={:?} , type={}, crc={}",
+                    self.len, self.data, self.chunk_type, self.crc
+                )
+            }
+            chunk_type::Types::IEND => writeln!(f, "IEND : END OF IMAGE"),
+            _ => writeln!(
+                f,
+                "Chunk: Data_len={}, type={}, crc={}",
+                self.len, self.chunk_type, self.crc
+            ),
+        }
     }
 }
 
@@ -50,7 +63,7 @@ impl TryFrom<&[u8]> for Chunk {
 
         // check if the input slice is at least 12 bytes long
         if vc.len() < 12 {
-            return Err(ChunkkError::TooShort.into());
+            return Err(ChunkError::TooShort.into());
         }
 
         // first 4 bytes is the length of the data
@@ -87,12 +100,12 @@ impl TryFrom<&[u8]> for Chunk {
         if crc32.checksum(&bytes) == crc {
             Ok(Self {
                 len,
-                typ: chunk_type,
+                chunk_type,
                 data,
                 crc,
             })
         } else {
-            Err(ChunkkError::InvalidCrc.into())
+            Err(ChunkError::InvalidCrc.into())
         }
     }
 }
@@ -110,7 +123,7 @@ impl Chunk {
             .collect();
         Self {
             len: data.len() as u32,
-            typ: chunk_type,
+            chunk_type,
             data: data.clone(),
             crc: crc32.checksum(&bytes),
         }
@@ -119,7 +132,7 @@ impl Chunk {
         self.len
     }
     pub fn chunk_type(&self) -> &ChunkType {
-        &self.typ
+        &self.chunk_type
     }
     pub fn data(&self) -> &[u8] {
         self.data.as_slice()
@@ -133,11 +146,23 @@ impl Chunk {
     pub fn as_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&self.len.to_be_bytes());
-        bytes.extend_from_slice(&self.typ.bytes());
+        bytes.extend_from_slice(&self.chunk_type.bytes());
         bytes.extend_from_slice(&self.data);
         bytes.extend_from_slice(&self.crc.to_be_bytes());
 
         bytes
+    }
+
+    pub fn len(&self) -> u32 {
+        self.len
+    }
+
+    pub fn type_str(&self) -> String {
+        self.chunk_type.code.iter().map(|&b| b as char).collect()
+    }
+
+    pub fn get_type(&self) -> chunk_type::Types {
+        self.chunk_type.typ.clone()
     }
 }
 

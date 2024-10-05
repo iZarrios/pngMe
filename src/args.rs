@@ -32,4 +32,8 @@ pub enum Commands {
     Print {
         png_file: PathBuf,
     },
+
+    Verify {
+        png_file: PathBuf,
+    },
 }
