@@ -2,18 +2,24 @@ use std::{fmt::Display, str::FromStr};
 
 use crate::{Error, Result};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Types {
+    IHDR,
+    IDAT,
+    PLTE,
+    IEND,
+    ANCILLARY,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ChunkType {
-    type_code: [u8; 4],
+    pub typ: Types,
+    pub code: [u8; 4],
 }
 
 impl Display for ChunkType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            std::str::from_utf8(&self.type_code).unwrap_or_default()
-        )
+        write!(f, "{}", std::str::from_utf8(&self.code).unwrap_or_default())
     }
 }
 
@@ -37,8 +43,11 @@ impl FromStr for ChunkType {
         let mut chunk_code = [0u8; 4];
         chunk_code.copy_from_slice(code);
 
+        let typ = ChunkType::_get_type_from_code(chunk_code);
+
         Ok(ChunkType {
-            type_code: chunk_code,
+            code: chunk_code,
+            typ,
         })
     }
 }
@@ -47,34 +56,45 @@ impl TryFrom<[u8; 4]> for ChunkType {
     type Error = Error;
 
     fn try_from(value: [u8; 4]) -> Result<Self> {
-        Ok(ChunkType { type_code: value })
+        let typ = ChunkType::_get_type_from_code(value);
+        Ok(ChunkType { code: value, typ })
     }
 }
 
 #[allow(unused)]
 impl ChunkType {
     pub fn bytes(&self) -> [u8; 4] {
-        self.type_code
+        self.code
     }
 
     /// Returns true if the reserved byte is valid and all four bytes are represented by the characters A-Z or a-z.
     /// Note that this chunk type should always be valid as it is validated during construction.
     pub fn is_valid(&self) -> bool {
-        self.type_code.iter().all(|&byt| byt.is_ascii()) & self.is_reserved_bit_valid()
+        self.code.iter().all(|&byt| byt.is_ascii()) & self.is_reserved_bit_valid()
     }
 
     pub fn is_critical(&self) -> bool {
-        self.type_code[0].is_ascii_uppercase()
+        self.code[0].is_ascii_uppercase()
     }
     pub fn is_public(&self) -> bool {
-        self.type_code[1].is_ascii_uppercase()
+        self.code[1].is_ascii_uppercase()
     }
     pub fn is_reserved_bit_valid(&self) -> bool {
-        self.type_code[2].is_ascii_uppercase()
+        self.code[2].is_ascii_uppercase()
     }
 
     pub fn is_safe_to_copy(&self) -> bool {
-        !self.type_code[3].is_ascii_uppercase()
+        !self.code[3].is_ascii_uppercase()
+    }
+
+    fn _get_type_from_code(code: [u8; 4]) -> Types {
+        match code {
+            [73, 72, 68, 82] => Types::IHDR,
+            [73, 68, 65, 84] => Types::IDAT,
+            [80, 76, 84, 69] => Types::PLTE,
+            [73, 69, 78, 68] => Types::IEND,
+            _ => Types::ANCILLARY,
+        }
     }
 }
 
