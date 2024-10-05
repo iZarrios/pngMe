@@ -1,14 +1,17 @@
 use std::str::FromStr;
 
-use crate::{chunk::Chunk, chunk_type::ChunkType, Error, Result};
+use crate::{
+    chunk::Chunk,
+    chunk_type::{self, ChunkType},
+    Error, Result,
+};
 
 pub struct Png {
-    chunks: Vec<Chunk>,
+    pub chunks: Vec<Chunk>,
 }
 
 #[derive(Debug)]
 pub enum PngError {
-    // InvalidChunkTypeHeader,
     InvalidPngHeader,
     InvalidChunk,
     TooShort,
@@ -22,7 +25,6 @@ impl std::fmt::Display for PngError {
             PngError::InvalidPngHeader => write!(f, "Invalid PNG header"),
             PngError::InvalidChunk => write!(f, "Invalid PNG chunk"),
             PngError::TooShort => write!(f, "Data is too short"),
-            // PngError::InvalidChunkTypeHeader => write!(f, "Invalid chunk type header"),
         }
     }
 }
@@ -31,6 +33,12 @@ impl Png {
     const STANDARD_HEADER: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 
     pub fn from_chunks(chunks: Vec<Chunk>) -> Png {
+        // FIXME: what if there are no chunks?
+        // FIXME: what if the first chunk is not IHDR?
+        // FIXME: what if the last chunk is not IEND?
+        //
+        // We should probably return a Result<Png, Error> instead of just Png and also we need to
+        // verify the integrity of the PNG file
         Png { chunks }
     }
 
@@ -73,6 +81,34 @@ impl Png {
         }
         bytes
     }
+
+    /// Verify the integrity of the PNG file
+    ///
+    /// This function will check the integrity of the PNG file by verifying the CRC of each chunk.
+    /// If the CRC of any chunk is invalid, this function will return false.
+    /// If all CRCs are valid, this function will return true.
+    pub fn verify(&self) -> bool {
+        // Every PNG file must have at least 2 chunks: `IHDR` and `IEND`
+        if self.chunks.is_empty() || self.chunks.len() < 2 {
+            return false;
+        }
+
+        // First we need to verify that the start of the PNG has a chunk type of `IHDR`
+        if self.chunks.first().unwrap().get_type() != chunk_type::Types::IHDR {
+            return false;
+        }
+
+        // We also need to verify that the end of the PNG has a chunk type of `IEND`
+        if self.chunks.last().unwrap().get_type() != chunk_type::Types::IEND {
+            return false;
+        }
+
+        return true;
+    }
+
+    pub fn get_color_type(&self) -> u8 {
+        self.chunks[0].data[9]
+    }
 }
 
 impl TryFrom<&[u8]> for Png {
@@ -92,7 +128,7 @@ impl TryFrom<&[u8]> for Png {
 
         let mut idx = Png::STANDARD_HEADER.len();
 
-        let mut chunks = vec![];
+        let mut chunks: Vec<Chunk> = vec![];
 
         while idx < value.len() {
             let current_chunk_length =
@@ -106,8 +142,7 @@ impl TryFrom<&[u8]> for Png {
             let chunk_data = &value[idx..idx + current_chunk_length];
             idx += current_chunk_length;
 
-            let crc =
-                u32::from_be_bytes([value[idx], value[idx + 1], value[idx + 2], value[idx + 3]]);
+            // CRC is the last 4 bytes of the chunk
             idx += 4;
 
             let chunk = Chunk::new(ChunkType::from_str(chunk_type)?, chunk_data.to_vec());
@@ -115,7 +150,7 @@ impl TryFrom<&[u8]> for Png {
             chunks.push(chunk);
         }
 
-        return Ok(Png { chunks });
+        return Ok(Png::from_chunks(chunks));
     }
 }
 
@@ -125,6 +160,13 @@ impl std::fmt::Display for Png {
         for chunk in &self.chunks {
             chunks.push_str(&format!("{}", chunk));
         }
+
+        //
+        // let first_chunk = png.chunks[0].clone();
+        // let ihdr_chunk = IhdrChunk::try_from(first_chunk)?;
+        //
+        // println!("IHDR Chunk: {:?}", ihdr_chunk);
+
         write!(f, "{}", chunks)
     }
 }

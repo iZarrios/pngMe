@@ -27,6 +27,7 @@ pub fn run(args: &Cli) -> Result<()> {
         } => remove(&file_path, &chunk_type)?,
 
         Commands::Print { png_file } => print(png_file)?,
+        Commands::Verify { png_file } => verify(png_file)?,
     }
 
     Ok(())
@@ -98,9 +99,25 @@ fn print(file_path: &PathBuf) -> Result<()> {
     let file = fs::read(file_path)?;
 
     let png = Png::try_from(file.as_slice())?;
-
     println!("{}", png);
 
     Ok(())
 }
 
+fn verify(file_path: &PathBuf) -> Result<()> {
+    if file_path.extension().unwrap() != "png" {
+        return Err("This program takes only PNG files".into());
+    }
+
+    let file = fs::read(file_path)?;
+
+    let png = Png::try_from(file.as_slice())?;
+
+    if png.verify() {
+        println!("File is a valid PNG");
+    } else {
+        println!("File is not a valid PNG");
+    }
+
+    Ok(())
+}
